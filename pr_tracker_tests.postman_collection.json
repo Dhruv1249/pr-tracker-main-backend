@@ -1,0 +1,87 @@
+{
+	"info": {
+		"name": "PR Tracker Tests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "url", "value": "http://localhost:5000" },
+		{ "key": "repoId", "value": "" },
+		{ "key": "prId", "value": "" }
+	],
+	"item": [
+		{
+			"name": "1. Track Repo",
+			"event": [{ "listen": "test", "script": { "exec": ["var r=pm.response.json(); if(r.repo) pm.collectionVariables.set('repoId',r.repo._id);"] } }],
+			"request": { "method": "POST", "url": "{{url}}/api/repos/track", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"owner\":\"expressjs\",\"name\":\"express\"}" } }
+		},
+		{
+			"name": "2. Tracked Repos",
+			"request": { "method": "GET", "url": "{{url}}/api/repos/tracked" }
+		},
+		{
+			"name": "3. List PRs",
+			"event": [{ "listen": "test", "script": { "exec": ["var r=pm.response.json(); if(r.length>0) pm.collectionVariables.set('prId',r[0]._id);"] } }],
+			"request": { "method": "GET", "url": "{{url}}/api/repos/{{repoId}}/prs" }
+		},
+		{
+			"name": "4. PR Details",
+			"request": { "method": "GET", "url": "{{url}}/api/prs/{{prId}}" }
+		},
+		{
+			"name": "5. PR Diff",
+			"request": { "method": "GET", "url": "{{url}}/api/prs/{{prId}}/diff" }
+		},
+		{
+			"name": "6. Submit Review",
+			"request": { "method": "POST", "url": "{{url}}/api/prs/{{prId}}/reviews", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"reviewer\":\"dhruv\",\"decision\":\"approve\",\"comment\":\"LGTM!\"}" } }
+		},
+		{
+			"name": "7. List Reviews",
+			"request": { "method": "GET", "url": "{{url}}/api/prs/{{prId}}/reviews" }
+		},
+		{
+			"name": "8. Add Tag",
+			"request": { "method": "POST", "url": "{{url}}/api/prs/{{prId}}/tags", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"tag\":\"backend\"}" } }
+		},
+		{
+			"name": "9. Remove Tag",
+			"request": { "method": "DELETE", "url": "{{url}}/api/prs/{{prId}}/tags/backend" }
+		},
+		{
+			"name": "10. Close PR",
+			"request": { "method": "POST", "url": "{{url}}/api/prs/{{prId}}/close" }
+		},
+		{
+			"name": "11. Reopen PR",
+			"request": { "method": "POST", "url": "{{url}}/api/prs/{{prId}}/reopen" }
+		},
+		{
+			"name": "12. Merge PR",
+			"request": { "method": "POST", "url": "{{url}}/api/prs/{{prId}}/merge" }
+		},
+		{
+			"name": "13. Dashboard Stats",
+			"request": { "method": "GET", "url": "{{url}}/api/dashboard/stats" }
+		},
+		{
+			"name": "14. Recent PRs",
+			"request": { "method": "GET", "url": "{{url}}/api/dashboard/recent-prs" }
+		},
+		{
+			"name": "15. CLI Status",
+			"request": { "method": "GET", "url": "{{url}}/api/cli/status" }
+		},
+		{
+			"name": "16. Repo Details (GitHub)",
+			"request": { "method": "GET", "url": "{{url}}/api/repos/expressjs/express" }
+		},
+		{
+			"name": "17. Sync Repo",
+			"request": { "method": "POST", "url": "{{url}}/api/repos/{{repoId}}/sync" }
+		},
+		{
+			"name": "18. Health",
+			"request": { "method": "GET", "url": "{{url}}/api/health" }
+		}
+	]
+}
