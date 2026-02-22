@@ -51,42 +51,66 @@ exports.getPrTimeline = (req, res) => {
 };
 
 // POST /api/prs/:prId/merge
-exports.mergePr = (req, res) => {
+exports.mergePr = async (req, res) => {
     const pr = findPr(req.params.prId);
     if (!pr) return res.status(404).json({ error: "PR not found" });
     if (pr.status === "merged") return res.status(400).json({ error: "Already merged" });
     if (pr.status === "closed") return res.status(400).json({ error: "Cannot merge closed PR" });
 
-    pr.status = "merged";
-    pr.mergedAt = now();
-    pr.updatedAt = now();
-    res.json({ message: "PR merged", pr });
+    const repo = repoForPr(pr);
+    if (!repo) return res.status(404).json({ error: "Repo not found" });
+
+    try {
+        await github.mergePullRequest(repo.owner, repo.name, pr.number);
+        pr.status = "merged";
+        pr.mergedAt = now();
+        pr.updatedAt = now();
+        res.json({ message: "PR merged", pr });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
 };
 
 // POST /api/prs/:prId/close
-exports.closePr = (req, res) => {
+exports.closePr = async (req, res) => {
     const pr = findPr(req.params.prId);
     if (!pr) return res.status(404).json({ error: "PR not found" });
     if (pr.status === "merged") return res.status(400).json({ error: "Cannot close merged PR" });
 
-    pr.status = "closed";
-    pr.updatedAt = now();
-    res.json({ message: "PR closed", pr });
+    const repo = repoForPr(pr);
+    if (!repo) return res.status(404).json({ error: "Repo not found" });
+
+    try {
+        await github.closePullRequest(repo.owner, repo.name, pr.number);
+        pr.status = "closed";
+        pr.updatedAt = now();
+        res.json({ message: "PR closed", pr });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
 };
 
 // POST /api/prs/:prId/reopen
-exports.reopenPr = (req, res) => {
+exports.reopenPr = async (req, res) => {
     const pr = findPr(req.params.prId);
     if (!pr) return res.status(404).json({ error: "PR not found" });
     if (pr.status !== "closed") return res.status(400).json({ error: "Only closed PRs can be reopened" });
 
-    pr.status = "open";
-    pr.updatedAt = now();
-    res.json({ message: "PR reopened", pr });
+    const repo = repoForPr(pr);
+    if (!repo) return res.status(404).json({ error: "Repo not found" });
+
+    try {
+        await github.reopenPullRequest(repo.owner, repo.name, pr.number);
+        pr.status = "open";
+        pr.updatedAt = now();
+        res.json({ message: "PR reopened", pr });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
 };
 
 // POST /api/prs/:prId/reviews
-exports.submitReview = (req, res) => {
+exports.submitReview = async (req, res) => {
     const pr = findPr(req.params.prId);
     if (!pr) return res.status(404).json({ error: "PR not found" });
 
@@ -96,16 +120,29 @@ exports.submitReview = (req, res) => {
         return res.status(400).json({ error: `decision must be one of: ${valid.join(", ")}` });
     }
 
-    const review = {
-        _id: newId(),
-        prId: pr._id,
-        reviewer: reviewer || "anonymous",
-        decision,
-        comment: comment || "",
-        createdAt: now(),
-    };
-    store.reviews.push(review);
-    res.status(201).json(review);
+    const repo = repoForPr(pr);
+    if (!repo) return res.status(404).json({ error: "Repo not found" });
+
+    let githubEvent = "COMMENT";
+    if (decision === "approve") githubEvent = "APPROVE";
+    if (decision === "request_changes") githubEvent = "REQUEST_CHANGES";
+
+    try {
+        await github.createPrReview(repo.owner, repo.name, pr.number, githubEvent, comment || "");
+
+        const review = {
+            _id: newId(),
+            prId: pr._id,
+            reviewer: reviewer || "anonymous",
+            decision,
+            comment: comment || "",
+            createdAt: now(),
+        };
+        store.reviews.push(review);
+        res.status(201).json(review);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
 };
 
 // GET /api/prs/:prId/reviews

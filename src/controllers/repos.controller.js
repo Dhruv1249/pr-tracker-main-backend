@@ -67,9 +67,14 @@ exports.trackRepo = async (req, res) => {
         };
         store.repos.push(repo);
 
-        // Import open PRs
-        const ghPrs = await github.listPullRequests(owner, name);
+        // Import all PRs (open and closed)
+        const ghPrs = await github.listPullRequests(owner, name, "all");
         for (const ghPr of ghPrs) {
+            let status = "open";
+            if (ghPr.merged_at) status = "merged";
+            else if (ghPr.state === "closed") status = "closed";
+            else if (ghPr.draft) status = "draft";
+
             store.pullRequests.push({
                 _id: newId(),
                 repoId: repo._id,
@@ -77,7 +82,7 @@ exports.trackRepo = async (req, res) => {
                 number: ghPr.number,
                 title: ghPr.title,
                 author: ghPr.user.login,
-                status: ghPr.draft ? "draft" : "open",
+                status: status,
                 url: ghPr.html_url,
                 baseBranch: ghPr.base.ref,
                 headBranch: ghPr.head.ref,
@@ -87,7 +92,7 @@ exports.trackRepo = async (req, res) => {
                 lastCommitSha: ghPr.head.sha,
                 createdAt: ghPr.created_at,
                 updatedAt: ghPr.updated_at,
-                mergedAt: null,
+                mergedAt: ghPr.merged_at || null,
             });
         }
 

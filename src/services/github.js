@@ -40,7 +40,7 @@ async function getRepo(owner, name) {
 }
 
 /** List open PRs for a repo */
-async function listPullRequests(owner, name, state = "open", page = 1, perPage = 30) {
+async function listPullRequests(owner, name, state = "all", page = 1, perPage = 30) {
     return ghFetch(
         `/repos/${owner}/${name}/pulls?state=${state}&per_page=${perPage}&page=${page}`
     );
@@ -76,6 +76,75 @@ async function listPrReviews(owner, name, prNumber) {
     return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/reviews`);
 }
 
+/** Merge a PR */
+async function mergePullRequest(owner, name, prNumber, commitTitle = "") {
+    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}/merge`, {
+        method: "PUT",
+        headers: headers(),
+        body: JSON.stringify({
+            commit_title: commitTitle || `Merge PR #${prNumber}`
+        })
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        const err = new Error(`GitHub API ${res.status}: ${body}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
+
+/** Close a PR */
+async function closePullRequest(owner, name, prNumber) {
+    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ state: "closed" })
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        const err = new Error(`GitHub API ${res.status}: ${body}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
+
+/** Reopen a closed PR */
+async function reopenPullRequest(owner, name, prNumber) {
+    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({ state: "open" })
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        const err = new Error(`GitHub API ${res.status}: ${body}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
+
+/** Create a PR review */
+async function createPrReview(owner, name, prNumber, event, bodyText) {
+    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}/reviews`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+            event: event, // "APPROVE", "REQUEST_CHANGES", "COMMENT"
+            body: bodyText
+        })
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        const err = new Error(`GitHub API ${res.status}: ${body}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
+
 module.exports = {
     listUserRepos,
     getRepo,
@@ -83,4 +152,8 @@ module.exports = {
     getPullRequest,
     getPullRequestDiff,
     listPrReviews,
+    mergePullRequest,
+    closePullRequest,
+    reopenPullRequest,
+    createPrReview,
 };
