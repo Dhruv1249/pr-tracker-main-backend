@@ -1,0 +1,66 @@
+name: Deploy Main Backend to Google Cloud
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-south2
+  REPOSITORY: pr-tracker-repo
+  SERVICE_NAME: pr-tracker-main-backend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Google Auth
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker push
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Container
+        run: |
+          IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
+
+          docker build -t $IMAGE_NAME:latest .
+
+          docker push $IMAGE_NAME:latest
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+          flags: "--port=5002 --allow-unauthenticated"
+
+      - name: Clean up old Artifact Registry images
+        run: |
+          IMAGE_PATH="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
+          OLD_DIGESTS=$(gcloud artifacts docker images list "$IMAGE_PATH" \
+            --format='get(DIGEST)' \
+            --sort-by=~UPDATE_TIME | tail -n +2)
+          if [ -n "$OLD_DIGESTS" ]; then
+            echo "$OLD_DIGESTS" | while read -r digest; do
+              echo "Deleting $IMAGE_PATH@$digest"
+              gcloud artifacts docker images delete "$IMAGE_PATH@$digest" --quiet --delete-tags
+            done
+          else
+            echo "No old images to clean up"
+          fi
