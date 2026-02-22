@@ -2,8 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
+
 
 const { errorHandler } = require("./middleware/errorHandler");
 
@@ -16,9 +15,8 @@ const cliRoutes = require("./routes/cli.routes");
 const app = express();
 const PORT = process.env.PORT || 5002;
 
-app.use(helmet());
-app.use(cors());
-app.use(morgan("dev"));
+app.use(cors({ origin: process.env.PROXY_URL, credentials: true }));
+
 app.use(express.json());
 
 app.use(reposRoutes);
