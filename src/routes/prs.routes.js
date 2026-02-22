@@ -7,6 +7,8 @@ const router = Router();
 router.get("/api/prs/:prId", ctrl.getPrDetails);
 router.get("/api/prs/:prId/diff", ctrl.getPrDiff);
 
+router.get("/api/prs/:prId/conflicts", ctrl.checkConflicts);
+
 // Lifecycle
 router.post("/api/prs/:prId/merge", ctrl.mergePr);
 router.post("/api/prs/:prId/close", ctrl.closePr);

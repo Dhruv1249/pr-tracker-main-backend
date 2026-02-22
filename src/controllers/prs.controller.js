@@ -16,6 +16,25 @@ exports.getPrDetails = (req, res) => {
     res.json(pr);
 };
 
+// GET /api/prs/:prId/conflicts
+exports.checkConflicts = async (req, res) => {
+    const pr = findPr(req.params.prId);
+    if (!pr) return res.status(404).json({ error: "PR not found" });
+
+    const repo = repoForPr(pr);
+    if (!repo) return res.status(404).json({ error: "Repo not found" });
+
+    try {
+        const ghPr = await github.getPullRequest(repo.owner, repo.name, pr.number);
+        res.json({
+            mergeable: ghPr.mergeable,
+            mergeable_state: ghPr.mergeable_state
+        });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
 // GET /api/prs/:prId/diff
 exports.getPrDiff = async (req, res) => {
     const pr = findPr(req.params.prId);
