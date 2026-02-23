@@ -22,4 +22,7 @@ router.get("/api/prs/:prId/reviews", ctrl.listReviews);
 router.post("/api/prs/:prId/tags", ctrl.addTag);
 router.delete("/api/prs/:prId/tags/:tag", ctrl.removeTag);
 
+// AI Analysis
+router.post("/api/prs/:prId/analyze", ctrl.analyzePr);
+
 module.exports = router;
