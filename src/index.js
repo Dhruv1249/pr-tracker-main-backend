@@ -37,5 +37,4 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`\n  Core Backend running on http://localhost:${PORT}`);
-    console.log(`  GITHUB_TOKEN: ${process.env.GITHUB_TOKEN ? "set" : "NOT SET (60 req/hr)"}\n`);
 });

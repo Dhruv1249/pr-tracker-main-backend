@@ -96,7 +96,7 @@ exports.handleGithubWebhook = async (req, res) => {
                         avatarUrl: ghReview.user.avatar_url,
                         githubId: ghReview.user.id,
                     },
-                    state: ghReview.state,
+                    state: ghReview.state.toUpperCase(),
                     body: ghReview.body || "",
                     submittedAt: ghReview.submitted_at || new Date().toISOString(),
                 });

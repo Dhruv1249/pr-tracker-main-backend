@@ -1,148 +1,146 @@
 // ---------------------------------------------------------------------------
 // GitHub REST API helper
-// Uses native fetch (Node 18+). If a GITHUB_TOKEN is set it's sent as a
-// Bearer token — this raises rate limits from 60 → 5 000 req/hr and lets
-// us access private repos the token has access to.
+// All functions accept an optional `token` parameter. When provided, it's
+// used as the Bearer token for GitHub API calls. This enables per-user
+// authentication using the user's stored OAuth token.
+// Falls back to GITHUB_TOKEN env var if no token is passed.
 // ---------------------------------------------------------------------------
 
 const BASE = "https://api.github.com";
 
-function headers() {
+function headers(token) {
     const h = {
         Accept: "application/vnd.github+json",
         "User-Agent": "pr-tracker-core",
     };
-    if (process.env.GITHUB_TOKEN) {
-        h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    const t = token || process.env.GITHUB_TOKEN;
+    if (t) {
+        h.Authorization = `Bearer ${t}`;
     }
     return h;
 }
 
-async function ghFetch(path) {
-    const res = await fetch(`${BASE}${path}`, { headers: headers() });
+async function ghFetch(path, token, opts = {}) {
+    const res = await fetch(`${BASE}${path}`, {
+        headers: { ...headers(token), ...opts.headers },
+        ...opts,
+    });
     if (!res.ok) {
         const body = await res.text();
         const err = new Error(`GitHub API ${res.status}: ${body}`);
         err.status = res.status;
         throw err;
     }
-    return res.json();
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) return res.json();
+    return res.text();
 }
 
-/** List repos the authenticated user has access to (needs token) */
-async function listUserRepos(page = 1, perPage = 30) {
-    return ghFetch(`/user/repos?sort=updated&per_page=${perPage}&page=${page}`);
+/** List repos the authenticated user has access to */
+async function listUserRepos(page = 1, perPage = 30, token) {
+    return ghFetch(`/user/repos?sort=updated&per_page=${perPage}&page=${page}`, token);
 }
 
 /** Get a single repo */
-async function getRepo(owner, name) {
-    return ghFetch(`/repos/${owner}/${name}`);
+async function getRepo(owner, name, token) {
+    return ghFetch(`/repos/${owner}/${name}`, token);
 }
 
-/** List open PRs for a repo */
-async function listPullRequests(owner, name, state = "all", page = 1, perPage = 30) {
+/** List PRs for a repo */
+async function listPullRequests(owner, name, state = "all", page = 1, perPage = 30, token) {
     return ghFetch(
-        `/repos/${owner}/${name}/pulls?state=${state}&per_page=${perPage}&page=${page}`
+        `/repos/${owner}/${name}/pulls?state=${state}&per_page=${perPage}&page=${page}`,
+        token
     );
 }
 
 /** Get a single PR */
-async function getPullRequest(owner, name, prNumber) {
-    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}`);
+async function getPullRequest(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}`, token);
 }
 
 /** Get PR diff (raw patch) */
-async function getPullRequestDiff(owner, name, prNumber) {
-    const res = await fetch(
-        `${BASE}/repos/${owner}/${name}/pulls/${prNumber}`,
-        {
-            headers: {
-                ...headers(),
-                Accept: "application/vnd.github.diff",
-            },
-        }
-    );
-    if (!res.ok) {
-        const body = await res.text();
-        const err = new Error(`GitHub API ${res.status}: ${body}`);
-        err.status = res.status;
-        throw err;
-    }
-    return res.text();
+async function getPullRequestDiff(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}`, token, {
+        headers: { Accept: "application/vnd.github.diff" },
+    });
 }
 
 /** List reviews for a PR */
-async function listPrReviews(owner, name, prNumber) {
-    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/reviews`);
+async function listPrReviews(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/reviews`, token);
 }
 
 /** Merge a PR */
-async function mergePullRequest(owner, name, prNumber, commitTitle = "") {
-    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}/merge`, {
+async function mergePullRequest(owner, name, prNumber, token, commitTitle = "") {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/merge`, token, {
         method: "PUT",
-        headers: headers(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            commit_title: commitTitle || `Merge PR #${prNumber}`
-        })
+            commit_title: commitTitle || `Merge PR #${prNumber}`,
+        }),
     });
-    if (!res.ok) {
-        const body = await res.text();
-        const err = new Error(`GitHub API ${res.status}: ${body}`);
-        err.status = res.status;
-        throw err;
-    }
-    return res.json();
 }
 
 /** Close a PR */
-async function closePullRequest(owner, name, prNumber) {
-    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}`, {
+async function closePullRequest(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}`, token, {
         method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ state: "closed" })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "closed" }),
     });
-    if (!res.ok) {
-        const body = await res.text();
-        const err = new Error(`GitHub API ${res.status}: ${body}`);
-        err.status = res.status;
-        throw err;
-    }
-    return res.json();
 }
 
 /** Reopen a closed PR */
-async function reopenPullRequest(owner, name, prNumber) {
-    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}`, {
+async function reopenPullRequest(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}`, token, {
         method: "PATCH",
-        headers: headers(),
-        body: JSON.stringify({ state: "open" })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: "open" }),
     });
-    if (!res.ok) {
-        const body = await res.text();
-        const err = new Error(`GitHub API ${res.status}: ${body}`);
-        err.status = res.status;
-        throw err;
-    }
-    return res.json();
 }
 
 /** Create a PR review */
-async function createPrReview(owner, name, prNumber, event, bodyText) {
-    const res = await fetch(`${BASE}/repos/${owner}/${name}/pulls/${prNumber}/reviews`, {
+async function createPrReview(owner, name, prNumber, event, bodyText, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/reviews`, token, {
         method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-            event: event, // "APPROVE", "REQUEST_CHANGES", "COMMENT"
-            body: bodyText
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event, body: bodyText }),
     });
-    if (!res.ok) {
-        const body = await res.text();
-        const err = new Error(`GitHub API ${res.status}: ${body}`);
-        err.status = res.status;
+}
+
+/** Register a webhook on a repo for PR events */
+async function createRepoWebhook(owner, name, token) {
+    const webhookUrl = process.env.WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.warn("[github] WEBHOOK_URL not set, skipping webhook registration");
+        return null;
+    }
+
+    try {
+        return await ghFetch(`/repos/${owner}/${name}/hooks`, token, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: "web",
+                active: true,
+                events: ["pull_request", "pull_request_review"],
+                config: {
+                    url: webhookUrl,
+                    content_type: "json",
+                    secret: process.env.GITHUB_WEBHOOK_SECRET || "",
+                    insecure_ssl: "0",
+                },
+            }),
+        });
+    } catch (err) {
+        // 422 = webhook already exists, that's fine
+        if (err.status === 422) {
+            console.log(`[github] Webhook already exists on ${owner}/${name}`);
+            return null;
+        }
         throw err;
     }
-    return res.json();
 }
 
 module.exports = {
@@ -156,4 +154,5 @@ module.exports = {
     closePullRequest,
     reopenPullRequest,
     createPrReview,
+    createRepoWebhook,
 };
