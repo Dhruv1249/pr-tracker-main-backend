@@ -251,7 +251,7 @@ exports.syncRepo = async (req, res) => {
             }
         }
 
-        await db.updateRepo(repo.githubId, { lastSyncedAt: new Date(, req).toISOString() });
+        await db.updateRepo(repo.githubId, { lastSyncedAt: new Date().toISOString() }, req);
         res.json({ message: "Sync complete", created, updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "Repo not found" });

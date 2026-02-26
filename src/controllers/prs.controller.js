@@ -148,8 +148,8 @@ exports.submitReview = async (req, res) => {
             },
             state: dbState,
             body: comment || "",
-            submittedAt: new Date(, req).toISOString(),
-        });
+            submittedAt: new Date().toISOString(),
+        }, req);
 
         res.status(201).json(review);
     } catch (err) {
