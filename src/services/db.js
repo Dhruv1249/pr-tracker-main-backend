@@ -9,7 +9,6 @@ const PROXY = process.env.PROXY_URL;
 
 const client = axios.create({
     baseURL: PROXY,
-    headers: { "Content-Type": "application/json" },
 });
 
 async function dbFetch(method, path, data, req) {
@@ -24,12 +23,18 @@ async function dbFetch(method, path, data, req) {
             forwardHeaders.cookie = req.headers.cookie;
         }
 
-        const res = await client({
+        const config = {
             method,
             url: path,
-            data,
             headers: forwardHeaders,
-        });
+        };
+
+        // Only include body for methods that support it (not GET/DELETE)
+        if (data && !["get", "delete", "head"].includes(method.toLowerCase())) {
+            config.data = data;
+        }
+
+        const res = await client(config);
 
         return res.data.data ?? res.data;
     } catch (err) {
