@@ -12,14 +12,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 async function resolveGithubToken(req) {
     // 1. Try JWT from Authorization header
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    console.log("core auth headers:", req.headers);
+    const token = req.cookies.token;
+    console.log("token in core", token);
+    if (token) {
         try {
-            const token = authHeader.split(" ")[1];
             const decoded = jwt.verify(token, JWT_SECRET);
+            console.log("decoded JWT:", decoded);
 
             if (decoded.githubId) {
-                const user = await db.getUserByGithubId(decoded.githubId);
+                console.log("running query..")
+                const user = await db.getUserByGithubId(decoded.githubId, req);
+                console.log("db user:", user);
                 if (user && user.accessTokenEncrypted) {
                     return decrypt(user.accessTokenEncrypted);
                 }

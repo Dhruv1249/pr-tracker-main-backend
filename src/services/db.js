@@ -5,16 +5,23 @@
 
 const axios = require("axios");
 
-const PROXY = process.env.PROXY_URL || "http://localhost:5003";
+const PROXY = process.env.PROXY_URL;
 
 const client = axios.create({
     baseURL: PROXY,
     headers: { "Content-Type": "application/json" },
 });
 
-async function dbFetch(method, path, data) {
+async function dbFetch(method, path, data, req) {
     try {
-        const res = await client({ method, url: path, data });
+        console.log("req headers are", req.headers);
+        const res = await client({
+            method,
+            url: path,
+            data,
+            headers: req.headers,
+        });
+
         return res.data.data ?? res.data;
     } catch (err) {
         const status = err.response?.status || 500;
@@ -113,8 +120,11 @@ async function createUser(data) {
     return dbFetch("post", "/api/db/users", data);
 }
 
-async function getUserByGithubId(githubId) {
-    return dbFetch("get", `/api/db/users/github/${githubId}`);
+async function getUserByGithubId(githubId, req) {
+    console.log("this is the github id: ", githubId);
+    console.log("getuserbygithubid inside req headers are", req.headers);
+    const data = {}
+    return dbFetch("get", `/api/db/users/github/${githubId}`,data, req);
 }
 
 async function updateUser(githubId, data) {

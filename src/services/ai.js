@@ -18,7 +18,8 @@ const aiClient = axios.create({
  */
 async function getAIReview(diff) {
     const { data } = await aiClient.post("/api/ai/review", { content: diff });
-    return data.message;
+    // data.review is now a structured JSON object: { summary, bugs, codeQuality, performance, inlineFeedback }
+    return data.review;
 }
 
 /**

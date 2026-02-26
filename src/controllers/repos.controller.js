@@ -18,6 +18,7 @@ exports.listRepos = async (req, res) => {
                 url: r.html_url,
                 language: r.language,
                 updatedAt: r.updated_at,
+                openPrs: r.open_issues_count ?? 0,
             }))
         );
     } catch (err) {
@@ -270,3 +271,195 @@ exports.listPrsForRepo = async (req, res) => {
         res.status(err.status || 500).json({ error: err.message });
     }
 };
+
+// GET /api/repos/:owner/:name/pulls
+exports.listRepoPulls = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name } = req.params;
+        const state = req.query.state || "open";
+        const page = Number(req.query.page) || 1;
+        const perPage = Number(req.query.per_page) || 20;
+
+        const prs = await github.listPullRequests(owner, name, state, page, perPage, token);
+
+        // Normalize to a clean shape the frontend can consume
+        const mapped = prs.map((pr) => ({
+            id: pr.id,
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            draft: pr.draft,
+            merged_at: pr.merged_at,
+            user: { login: pr.user.login, avatar_url: pr.user.avatar_url },
+            head: { ref: pr.head.ref },
+            base: { ref: pr.base.ref, repo: { full_name: pr.base.repo?.full_name } },
+            labels: pr.labels || [],
+            html_url: pr.html_url,
+            created_at: pr.created_at,
+            updated_at: pr.updated_at,
+            comments: pr.comments,
+        }));
+
+        res.json({
+            data: mapped,
+            page,
+            perPage,
+            hasNextPage: mapped.length === perPage,
+        });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
+// GET /api/repos/:owner/:name/pulls/:number — single PR from GitHub
+exports.getPrByNumber = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name, number } = req.params;
+        const pr = await github.getPullRequest(owner, name, Number(number), token);
+        res.json({
+            id: pr.id,
+            number: pr.number,
+            title: pr.title,
+            body: pr.body || "",
+            state: pr.state,
+            draft: pr.draft,
+            merged_at: pr.merged_at,
+            user: { login: pr.user.login, avatar_url: pr.user.avatar_url },
+            head: { ref: pr.head.ref },
+            base: { ref: pr.base.ref, repo: { full_name: pr.base.repo?.full_name } },
+            labels: pr.labels || [],
+            html_url: pr.html_url,
+            created_at: pr.created_at,
+            updated_at: pr.updated_at,
+            comments: pr.comments,
+            mergeable: pr.mergeable,
+        });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
+// GET /api/repos/:owner/:name/pulls/:number/files — changed files with patches
+exports.listPrFilesByNumber = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name, number } = req.params;
+        const files = await github.listPrFiles(owner, name, Number(number), token);
+        const mapped = files.map((f) => ({
+            filename: f.filename,
+            status: f.status,
+            additions: f.additions,
+            deletions: f.deletions,
+            changes: f.changes,
+            patch: f.patch || null, // may be absent for binary files
+        }));
+        res.json(mapped);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
+// GET /api/repos/:owner/:name/pulls/:number/commits — commit list
+exports.listPrCommitsByNumber = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name, number } = req.params;
+        const commits = await github.listPrCommits(owner, name, Number(number), token);
+        const mapped = commits.map((c) => ({
+            sha: c.sha,
+            message: c.commit.message,
+            author: c.commit.author.name,
+            authorLogin: c.author?.login || "",
+            avatarUrl: c.author?.avatar_url || "",
+            date: c.commit.author.date,
+            url: c.html_url,
+        }));
+        res.json(mapped);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
+// GET /api/repos/:owner/:name/pulls/:number/comments — issue + review comments
+exports.listPrCommentsByNumber = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name, number } = req.params;
+
+        const [issueComments, reviewComments] = await Promise.all([
+            github.listPrComments(owner, name, Number(number), token),
+            github.listPrReviewComments(owner, name, Number(number), token),
+        ]);
+
+        const mapComment = (c, type) => ({
+            id: c.id,
+            type,                          // "issue" | "review"
+            body: c.body,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
+            author: { login: c.user?.login || "", avatarUrl: c.user?.avatar_url || "" },
+            // review-comment extras
+            path: c.path || null,
+            line: c.line || c.original_line || null,
+            diffHunk: c.diff_hunk || null,
+            inReplyToId: c.in_reply_to_id || null,
+            pullRequestReviewId: c.pull_request_review_id || null,
+            url: c.html_url,
+        });
+
+        const all = [
+            ...issueComments.map((c) => mapComment(c, "issue")),
+            ...reviewComments.map((c) => mapComment(c, "review")),
+        ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+        res.json(all);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+
+// POST /api/repos/:owner/:name/pulls/:number/analyze
+exports.analyzePrByNumber = async (req, res) => {
+    try {
+        const token = await resolveGithubToken(req);
+        const { owner, name, number } = req.params;
+
+        // 1. Get raw diff from GitHub
+        const diff = await github.getPullRequestDiff(owner, name, Number(number), token);
+        if (!diff) {
+            return res.status(400).json({ error: "Could not fetch PR diff" });
+        }
+
+        // 2. Run AI Analysis
+        // We import the AI service here to avoid circular deps if they exist, or at top of file
+        const aiService = require("../services/ai");
+        const analysis = await aiService.analyzeFullPR(diff);
+
+        // 3. Save to database using the existing prService/db functions if possible,
+        // or just return to client directly.
+        // For now, we'll try to update the PR record in the DB if it exists.
+        const fullName = `${owner}/${name}`;
+        try {
+            // Find PR by repo full name and number to attach the analysis
+            // We use raw mongodb query or db.js helper
+            const repo = await db.getRepoByFullName(fullName);
+            if (repo) {
+                const PR = require("../models/PullRequest");
+                await PR.findOneAndUpdate(
+                    { repository: repo._id, number: Number(number) },
+                    { $set: { aiAnalysis: analysis } }
+                );
+            }
+        } catch (dbErr) {
+            console.warn("Could not save AI analysis to DB:", dbErr.message);
+        }
+
+        res.json({ message: "Analysis complete", data: analysis });
+    } catch (err) {
+        console.error("AI Analysis Error:", err);
+        res.status(err.status || 500).json({ error: err.message });
+    }
+};
+

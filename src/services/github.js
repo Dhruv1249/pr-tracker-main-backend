@@ -71,6 +71,26 @@ async function listPrReviews(owner, name, prNumber, token) {
     return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/reviews`, token);
 }
 
+/** List files changed in a PR (includes per-file patches) */
+async function listPrFiles(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/files?per_page=100`, token);
+}
+
+/** List commits in a PR */
+async function listPrCommits(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/commits?per_page=100`, token);
+}
+
+/** List issue-level comments on a PR (the general discussion thread) */
+async function listPrComments(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/issues/${prNumber}/comments?per_page=100`, token);
+}
+
+/** List inline review comments on a PR (code-level comments) */
+async function listPrReviewComments(owner, name, prNumber, token) {
+    return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/comments?per_page=100`, token);
+}
+
 /** Merge a PR */
 async function mergePullRequest(owner, name, prNumber, token, commitTitle = "") {
     return ghFetch(`/repos/${owner}/${name}/pulls/${prNumber}/merge`, token, {
@@ -150,6 +170,10 @@ module.exports = {
     getPullRequest,
     getPullRequestDiff,
     listPrReviews,
+    listPrFiles,
+    listPrCommits,
+    listPrComments,
+    listPrReviewComments,
     mergePullRequest,
     closePullRequest,
     reopenPullRequest,
