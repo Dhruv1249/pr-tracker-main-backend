@@ -6,7 +6,7 @@ const { resolveGithubToken } = require("../services/userToken");
 // GET /api/prs/:prId
 exports.getPrDetails = async (req, res) => {
     try {
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         res.json(pr);
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -18,7 +18,7 @@ exports.getPrDetails = async (req, res) => {
 exports.checkConflicts = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const repo = pr.repository;
         if (!repo) return res.status(404).json({ error: "Repo not found" });
 
@@ -38,7 +38,7 @@ exports.checkConflicts = async (req, res) => {
 exports.getPrDiff = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const repo = pr.repository;
         if (!repo) return res.status(404).json({ error: "Repo not found" });
 
@@ -55,7 +55,7 @@ exports.getPrDiff = async (req, res) => {
 exports.mergePr = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         if (pr.state === "merged") return res.status(400).json({ error: "Already merged" });
         if (pr.state === "closed") return res.status(400).json({ error: "Cannot merge closed PR" });
 
@@ -64,7 +64,7 @@ exports.mergePr = async (req, res) => {
 
         const ownerLogin = repo.owner?.login || repo.fullName.split("/")[0];
         await github.mergePullRequest(ownerLogin, repo.name, pr.number, token);
-        const updated = await db.mergePRInDb(pr.githubId);
+        const updated = await db.mergePRInDb(pr.githubId, req);
         res.json({ message: "PR merged", pr: updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -76,7 +76,7 @@ exports.mergePr = async (req, res) => {
 exports.closePr = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         if (pr.state === "merged") return res.status(400).json({ error: "Cannot close merged PR" });
 
         const repo = pr.repository;
@@ -84,7 +84,7 @@ exports.closePr = async (req, res) => {
 
         const ownerLogin = repo.owner?.login || repo.fullName.split("/")[0];
         await github.closePullRequest(ownerLogin, repo.name, pr.number, token);
-        const updated = await db.closePRInDb(pr.githubId);
+        const updated = await db.closePRInDb(pr.githubId, req);
         res.json({ message: "PR closed", pr: updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -96,7 +96,7 @@ exports.closePr = async (req, res) => {
 exports.reopenPr = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         if (pr.state !== "closed") return res.status(400).json({ error: "Only closed PRs can be reopened" });
 
         const repo = pr.repository;
@@ -104,7 +104,7 @@ exports.reopenPr = async (req, res) => {
 
         const ownerLogin = repo.owner?.login || repo.fullName.split("/")[0];
         await github.reopenPullRequest(ownerLogin, repo.name, pr.number, token);
-        const updated = await db.reopenPRInDb(pr.githubId);
+        const updated = await db.reopenPRInDb(pr.githubId, req);
         res.json({ message: "PR reopened", pr: updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -116,7 +116,7 @@ exports.reopenPr = async (req, res) => {
 exports.submitReview = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const { decision, comment, reviewer } = req.body;
         const valid = ["approve", "request_changes", "comment"];
         if (!decision || !valid.includes(decision)) {
@@ -148,7 +148,7 @@ exports.submitReview = async (req, res) => {
             },
             state: dbState,
             body: comment || "",
-            submittedAt: new Date().toISOString(),
+            submittedAt: new Date(, req).toISOString(),
         });
 
         res.status(201).json(review);
@@ -161,8 +161,8 @@ exports.submitReview = async (req, res) => {
 // GET /api/prs/:prId/reviews
 exports.listReviews = async (req, res) => {
     try {
-        const pr = await db.getPRById(req.params.prId);
-        const reviews = await db.getReviewsByPR(pr._id);
+        const pr = await db.getPRById(req.params.prId, req);
+        const reviews = await db.getReviewsByPR(pr._id, req);
         res.json(reviews);
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -173,7 +173,7 @@ exports.listReviews = async (req, res) => {
 // POST /api/prs/:prId/tags
 exports.addTag = async (req, res) => {
     try {
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const { tag } = req.body;
         if (!tag) return res.status(400).json({ error: "tag is required" });
 
@@ -181,7 +181,7 @@ exports.addTag = async (req, res) => {
         if (!labels.some((l) => l.name === tag)) {
             labels.push({ name: tag, color: "" });
         }
-        const updated = await db.updatePR(pr.githubId, { labels });
+        const updated = await db.updatePR(pr.githubId, { labels }, req);
         res.json({ message: "Tag added", tags: updated.labels });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -192,12 +192,12 @@ exports.addTag = async (req, res) => {
 // DELETE /api/prs/:prId/tags/:tag
 exports.removeTag = async (req, res) => {
     try {
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const labels = (pr.labels || []).filter((l) => l.name !== req.params.tag);
         if (labels.length === (pr.labels || []).length) {
             return res.status(404).json({ error: "Tag not found" });
         }
-        const updated = await db.updatePR(pr.githubId, { labels });
+        const updated = await db.updatePR(pr.githubId, { labels }, req);
         res.json({ message: "Tag removed", tags: updated.labels });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "PR not found" });
@@ -209,7 +209,7 @@ exports.removeTag = async (req, res) => {
 exports.analyzePr = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const pr = await db.getPRById(req.params.prId);
+        const pr = await db.getPRById(req.params.prId, req);
         const repo = pr.repository;
         if (!repo) return res.status(404).json({ error: "Repo not found" });
 
@@ -217,7 +217,7 @@ exports.analyzePr = async (req, res) => {
         const diff = await github.getPullRequestDiff(ownerLogin, repo.name, pr.number, token);
 
         const analysis = await ai.analyzeFullPR(diff);
-        const updated = await db.updatePR(pr.githubId, analysis);
+        const updated = await db.updatePR(pr.githubId, analysis, req);
 
         res.json({ message: "AI analysis complete", pr: updated });
     } catch (err) {

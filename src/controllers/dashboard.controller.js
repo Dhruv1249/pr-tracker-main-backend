@@ -3,10 +3,10 @@ const db = require("../services/db");
 // GET /api/dashboard/stats
 exports.getStats = async (req, res) => {
     try {
-        const allPrs = await db.getAllPRs();
+        const allPrs = await db.getAllPRs(req);
         const open = allPrs.filter((p) => p.state === "open");
 
-        const allReviews = await db.getAllReviews();
+        const allReviews = await db.getAllReviews(req);
 
         res.json({
             openPrs: open.length,
@@ -24,7 +24,7 @@ exports.getStats = async (req, res) => {
 // GET /api/dashboard/recent-prs
 exports.getRecentPrs = async (req, res) => {
     try {
-        const allPrs = await db.getAllPRs();
+        const allPrs = await db.getAllPRs(req);
         const recent = allPrs.slice(0, 10); // already sorted by createdAt desc
         res.json(recent);
     } catch (err) {

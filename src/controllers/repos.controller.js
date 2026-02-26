@@ -59,7 +59,7 @@ exports.trackRepo = async (req, res) => {
         // Check if already tracked
         let existing = null;
         try {
-            existing = await db.getRepoByFullName(fullName);
+            existing = await db.getRepoByFullName(fullName, req);
         } catch (e) {
             if (e.status !== 404) throw e;
         }
@@ -73,12 +73,12 @@ exports.trackRepo = async (req, res) => {
         let repo;
         if (existing) {
             // Re-activate previously untracked repo
-            repo = await db.updateRepo(existing.githubId, { isActive: true });
+            repo = await db.updateRepo(existing.githubId, { isActive: true }, req);
         } else {
             // Also check by githubId to handle renames
             let existingById = null;
             try {
-                existingById = await db.getRepoByGithubId(ghRepo.id);
+                existingById = await db.getRepoByGithubId(ghRepo.id, req);
             } catch (e) {
                 if (e.status !== 404) throw e;
             }
@@ -88,7 +88,7 @@ exports.trackRepo = async (req, res) => {
                     fullName: ghRepo.full_name,
                     name: ghRepo.name,
                     isActive: true,
-                });
+                }, req);
             } else {
                 repo = await db.createRepo({
                     githubId: ghRepo.id,
@@ -105,7 +105,7 @@ exports.trackRepo = async (req, res) => {
                     language: ghRepo.language,
                     defaultBranch: ghRepo.default_branch,
                     isActive: true,
-                });
+                }, req);
             }
         }
 
@@ -127,14 +127,14 @@ exports.trackRepo = async (req, res) => {
 
             // Check if PR already exists
             try {
-                await db.getPRByGithubId(ghPr.id);
+                await db.getPRByGithubId(ghPr.id, req);
                 // Already exists, update it
                 await db.updatePR(ghPr.id, {
                     title: ghPr.title,
                     state,
                     updatedAtGithub: ghPr.updated_at,
                     mergedAt: ghPr.merged_at || null,
-                });
+                }, req);
             } catch (e) {
                 if (e.status === 404) {
                     await db.createPR({
@@ -156,7 +156,7 @@ exports.trackRepo = async (req, res) => {
                         createdAtGithub: ghPr.created_at,
                         updatedAtGithub: ghPr.updated_at,
                         mergedAt: ghPr.merged_at || null,
-                    });
+                    }, req);
                     imported++;
                 } else {
                     throw e;
@@ -173,10 +173,10 @@ exports.trackRepo = async (req, res) => {
 // DELETE /api/repos/track/:repoId
 exports.untrackRepo = async (req, res) => {
     try {
-        const repo = await db.getRepoById(req.params.repoId);
+        const repo = await db.getRepoById(req.params.repoId, req);
         if (!repo) return res.status(404).json({ error: "Repo not found" });
 
-        const updated = await db.updateRepo(repo.githubId, { isActive: false });
+        const updated = await db.updateRepo(repo.githubId, { isActive: false }, req);
         res.json({ message: "Repo untracked", repo: updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "Repo not found" });
@@ -187,7 +187,7 @@ exports.untrackRepo = async (req, res) => {
 // GET /api/repos/tracked
 exports.listTrackedRepos = async (req, res) => {
     try {
-        const repos = await db.getAllRepos();
+        const repos = await db.getAllRepos(req);
         res.json(repos.filter((r) => r.isActive));
     } catch (err) {
         res.status(err.status || 500).json({ error: err.message });
@@ -198,7 +198,7 @@ exports.listTrackedRepos = async (req, res) => {
 exports.syncRepo = async (req, res) => {
     try {
         const token = await resolveGithubToken(req);
-        const repo = await db.getRepoById(req.params.repoId);
+        const repo = await db.getRepoById(req.params.repoId, req);
         if (!repo) return res.status(404).json({ error: "Repo not found" });
 
         const ownerLogin = repo.owner?.login || repo.fullName.split("/")[0];
@@ -214,13 +214,13 @@ exports.syncRepo = async (req, res) => {
             else if (ghPr.draft) state = "draft";
 
             try {
-                await db.getPRByGithubId(ghPr.id);
+                await db.getPRByGithubId(ghPr.id, req);
                 await db.updatePR(ghPr.id, {
                     title: ghPr.title,
                     state,
                     updatedAtGithub: ghPr.updated_at,
                     mergedAt: state === "merged" ? ghPr.merged_at : undefined,
-                });
+                }, req);
                 updated++;
             } catch (e) {
                 if (e.status === 404) {
@@ -243,7 +243,7 @@ exports.syncRepo = async (req, res) => {
                         createdAtGithub: ghPr.created_at,
                         updatedAtGithub: ghPr.updated_at,
                         mergedAt: ghPr.merged_at || null,
-                    });
+                    }, req);
                     created++;
                 } else {
                     throw e;
@@ -251,7 +251,7 @@ exports.syncRepo = async (req, res) => {
             }
         }
 
-        await db.updateRepo(repo.githubId, { lastSyncedAt: new Date().toISOString() });
+        await db.updateRepo(repo.githubId, { lastSyncedAt: new Date(, req).toISOString() });
         res.json({ message: "Sync complete", created, updated });
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "Repo not found" });
@@ -262,9 +262,9 @@ exports.syncRepo = async (req, res) => {
 // GET /api/repos/:repoId/prs
 exports.listPrsForRepo = async (req, res) => {
     try {
-        const repo = await db.getRepoById(req.params.repoId);
+        const repo = await db.getRepoById(req.params.repoId, req);
         if (!repo) return res.status(404).json({ error: "Repo not found" });
-        const prs = await db.getPRsByRepository(repo._id);
+        const prs = await db.getPRsByRepository(repo._id, req);
         res.json(prs);
     } catch (err) {
         if (err.status === 404) return res.status(404).json({ error: "Repo not found" });
@@ -444,7 +444,7 @@ exports.analyzePrByNumber = async (req, res) => {
         try {
             // Find PR by repo full name and number to attach the analysis
             // We use raw mongodb query or db.js helper
-            const repo = await db.getRepoByFullName(fullName);
+            const repo = await db.getRepoByFullName(fullName, req);
             if (repo) {
                 const PR = require("../models/PullRequest");
                 await PR.findOneAndUpdate(

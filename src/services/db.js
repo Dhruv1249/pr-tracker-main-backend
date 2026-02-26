@@ -49,90 +49,90 @@ async function dbFetch(method, path, data, req) {
 
 // ---- Repositories (proxied at /api/repositories) ----
 
-async function createRepo(data) {
-    return dbFetch("post", "/api/repositories", data);
+async function createRepo(data, req) {
+    return dbFetch("post", "/api/repositories", data, req);
 }
 
-async function getRepoById(id) {
-    return dbFetch("get", `/api/repositories/${id}`);
+async function getRepoById(id, req) {
+    return dbFetch("get", `/api/repositories/${id}`, null, req);
 }
 
-async function getRepoByGithubId(githubId) {
-    return dbFetch("get", `/api/repositories/github/${githubId}`);
+async function getRepoByGithubId(githubId, req) {
+    return dbFetch("get", `/api/repositories/github/${githubId}`, null, req);
 }
 
-async function getRepoByFullName(fullName) {
-    return dbFetch("get", `/api/repositories/fullname/${encodeURIComponent(fullName)}`);
+async function getRepoByFullName(fullName, req) {
+    return dbFetch("get", `/api/repositories/fullname/${encodeURIComponent(fullName)}`, null, req);
 }
 
-async function getAllRepos() {
-    return dbFetch("get", "/api/repositories");
+async function getAllRepos(req) {
+    return dbFetch("get", "/api/repositories", null, req);
 }
 
-async function updateRepo(githubId, data) {
-    return dbFetch("put", `/api/repositories/github/${githubId}`, data);
+async function updateRepo(githubId, data, req) {
+    return dbFetch("put", `/api/repositories/github/${githubId}`, data, req);
 }
 
 // ---- Pull Requests (proxied at /api/pullrequests) ----
 
-async function createPR(data) {
-    return dbFetch("post", "/api/pullrequests", data);
+async function createPR(data, req) {
+    return dbFetch("post", "/api/pullrequests", data, req);
 }
 
-async function getPRById(id) {
-    return dbFetch("get", `/api/pullrequests/${id}`);
+async function getPRById(id, req) {
+    return dbFetch("get", `/api/pullrequests/${id}`, null, req);
 }
 
-async function getPRByGithubId(githubId) {
-    return dbFetch("get", `/api/pullrequests/github/${githubId}`);
+async function getPRByGithubId(githubId, req) {
+    return dbFetch("get", `/api/pullrequests/github/${githubId}`, null, req);
 }
 
-async function getPRsByRepository(repositoryId) {
-    return dbFetch("get", `/api/pullrequests/repository/${repositoryId}`);
+async function getPRsByRepository(repositoryId, req) {
+    return dbFetch("get", `/api/pullrequests/repository/${repositoryId}`, null, req);
 }
 
-async function getPRsByState(state) {
-    return dbFetch("get", `/api/pullrequests/state/${state}`);
+async function getPRsByState(state, req) {
+    return dbFetch("get", `/api/pullrequests/state/${state}`, null, req);
 }
 
-async function getAllPRs() {
-    return dbFetch("get", "/api/pullrequests");
+async function getAllPRs(req) {
+    return dbFetch("get", "/api/pullrequests", null, req);
 }
 
-async function updatePR(githubId, data) {
-    return dbFetch("put", `/api/pullrequests/github/${githubId}`, data);
+async function updatePR(githubId, data, req) {
+    return dbFetch("put", `/api/pullrequests/github/${githubId}`, data, req);
 }
 
-async function mergePRInDb(githubId) {
-    return dbFetch("put", `/api/pullrequests/github/${githubId}/merge`);
+async function mergePRInDb(githubId, req) {
+    return dbFetch("put", `/api/pullrequests/github/${githubId}/merge`, null, req);
 }
 
-async function closePRInDb(githubId) {
-    return dbFetch("put", `/api/pullrequests/github/${githubId}/close`);
+async function closePRInDb(githubId, req) {
+    return dbFetch("put", `/api/pullrequests/github/${githubId}/close`, null, req);
 }
 
-async function reopenPRInDb(githubId) {
-    return dbFetch("put", `/api/pullrequests/github/${githubId}/reopen`);
+async function reopenPRInDb(githubId, req) {
+    return dbFetch("put", `/api/pullrequests/github/${githubId}/reopen`, null, req);
 }
 
 // ---- Reviews (proxied at /api/reviews) ----
 
-async function createReview(data) {
-    return dbFetch("post", "/api/reviews", data);
+async function createReview(data, req) {
+    return dbFetch("post", "/api/reviews", data, req);
 }
 
-async function getReviewsByPR(pullRequestId) {
-    return dbFetch("get", `/api/reviews/pullrequest/${pullRequestId}`);
+async function getReviewsByPR(pullRequestId, req) {
+    return dbFetch("get", `/api/reviews/pullrequest/${pullRequestId}`, null, req);
 }
 
-async function getAllReviews() {
-    return dbFetch("get", "/api/reviews");
+async function getAllReviews(req) {
+    return dbFetch("get", "/api/reviews", null, req);
 }
 
 // ---- Users (proxied at /api/db/users → mongodb's /api/users) ----
 
-async function createUser(data) {
-    return dbFetch("post", "/api/db/users", data);
+async function createUser(data, req) {
+    return dbFetch("post", "/api/db/users", data, req);
 }
 
 async function getUserByGithubId(githubId, req) {
@@ -140,8 +140,8 @@ async function getUserByGithubId(githubId, req) {
     return dbFetch("get", `/api/db/users/github/${githubId}`, data, req);
 }
 
-async function updateUser(githubId, data) {
-    return dbFetch("put", `/api/db/users/github/${githubId}`, data);
+async function updateUser(githubId, data, req) {
+    return dbFetch("put", `/api/db/users/github/${githubId}`, data, req);
 }
 
 module.exports = {
