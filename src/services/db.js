@@ -14,18 +14,28 @@ const client = axios.create({
 
 async function dbFetch(method, path, data, req) {
     try {
-        console.log("req headers are", req.headers);
+        // Only forward auth-related headers, not the entire browser header set
+        // (forwarding host, content-length, origin etc. breaks service-to-service calls)
+        const forwardHeaders = {};
+        if (req?.headers?.authorization) {
+            forwardHeaders.authorization = req.headers.authorization;
+        }
+        if (req?.headers?.cookie) {
+            forwardHeaders.cookie = req.headers.cookie;
+        }
+
         const res = await client({
             method,
             url: path,
             data,
-            headers: req.headers,
+            headers: forwardHeaders,
         });
 
         return res.data.data ?? res.data;
     } catch (err) {
         const status = err.response?.status || 500;
         const message = err.response?.data?.error || err.message;
+        console.error(`[dbFetch] ${method.toUpperCase()} ${path} → ${status}: ${message}`);
         const error = new Error(message);
         error.status = status;
         throw error;
@@ -121,10 +131,8 @@ async function createUser(data) {
 }
 
 async function getUserByGithubId(githubId, req) {
-    console.log("this is the github id: ", githubId);
-    console.log("getuserbygithubid inside req headers are", req.headers);
-    const data = {}
-    return dbFetch("get", `/api/db/users/github/${githubId}`,data, req);
+    const data = {};
+    return dbFetch("get", `/api/db/users/github/${githubId}`, data, req);
 }
 
 async function updateUser(githubId, data) {
