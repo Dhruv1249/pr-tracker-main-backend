@@ -11,10 +11,18 @@ const { decrypt } = require("./decrypt");
 const JWT_SECRET = process.env.JWT_SECRET;
 
 async function resolveGithubToken(req) {
-    // 1. Try JWT from Authorization header
-    console.log("core auth headers:", req.headers);
-    const token = req.cookies.token;
-    console.log("token in core", token);
+    // 1. Extract JWT from Authorization header or cookie
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.split(" ")[1];
+    }
+    if (!token && req.cookies?.token) {
+        token = req.cookies.token;
+    }
+
+    console.log("token in core:", token ? "present" : "missing");
+
     if (token) {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
@@ -23,7 +31,7 @@ async function resolveGithubToken(req) {
             if (decoded.githubId) {
                 console.log("running query..")
                 const user = await db.getUserByGithubId(decoded.githubId, req);
-                console.log("db user:", user);
+                console.log("db user:", user ? "found" : "not found");
                 if (user && user.accessTokenEncrypted) {
                     return decrypt(user.accessTokenEncrypted);
                 }
