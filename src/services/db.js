@@ -73,6 +73,10 @@ async function updateRepo(githubId, data, req) {
     return dbFetch("put", `/api/repositories/github/${githubId}`, data, req);
 }
 
+async function importRepositories(repoIds, req) {
+    return dbFetch("post", "/api/repositories/import", { repoIds }, req);
+}
+
 // ---- Pull Requests (proxied at /api/pullrequests) ----
 
 async function createPR(data, req) {
@@ -151,6 +155,7 @@ module.exports = {
     getRepoByFullName,
     getAllRepos,
     updateRepo,
+    importRepositories,
     createPR,
     getPRById,
     getPRByGithubId,

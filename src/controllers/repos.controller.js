@@ -164,6 +164,13 @@ exports.trackRepo = async (req, res) => {
             }
         }
 
+        // Link the repo to the current user
+        try {
+            await db.importRepositories([ghRepo.id], req);
+        } catch (err) {
+            console.warn(`[trackRepo] Failed to link repo to user: ${err.message}`);
+        }
+
         res.status(201).json({ repo, prsImported: imported });
     } catch (err) {
         res.status(err.status || 500).json({ error: err.message });
